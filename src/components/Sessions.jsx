@@ -5,7 +5,18 @@ export default function Sessions({ userId = null, pro = false }) {
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
   const [usedPro, setUsedPro] = useState(false)
+  const [showLegend, setShowLegend] = useState(false)
   const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+  useEffect(() => {
+    // Show the mini legend only once per device
+    try {
+      const seen = localStorage.getItem('sessions_legend_seen') === '1'
+      setShowLegend(!seen)
+    } catch {
+      setShowLegend(true)
+    }
+  }, [])
 
   const load = async () => {
     setLoading(true)
@@ -53,6 +64,11 @@ export default function Sessions({ userId = null, pro = false }) {
     }
   }
 
+  const dismissLegend = () => {
+    try { localStorage.setItem('sessions_legend_seen', '1') } catch {}
+    setShowLegend(false)
+  }
+
   const cappedCount = !pro && items.length > 5 ? 5 : null
   const totalCount = items.length
 
@@ -74,6 +90,20 @@ export default function Sessions({ userId = null, pro = false }) {
           <button onClick={load} className="text-sm text-indigo-700 hover:text-indigo-900">Refresh</button>
         </div>
       </div>
+
+      {showLegend && (
+        <div className="mb-3 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
+          <div className="flex items-start justify-between gap-2">
+            <p>
+              • The chip shows if your history request used a Pro token.<br />
+              • Rows that are dimmed are beyond the Free limit. Unlock with Pro to reveal them.<br />
+              • “Use Pro” activates your purchase on this device if you’ve already upgraded.
+            </p>
+            <button onClick={dismissLegend} className="shrink-0 text-indigo-700 hover:text-indigo-900 underline">Got it</button>
+          </div>
+        </div>
+      )}
+
       {loading && <p className="text-sm text-gray-500">Loading…</p>}
       {error && <p className="text-sm text-rose-600">{error}</p>}
       {(!loading && totalCount === 0) && <p className="text-sm text-gray-500">No sessions yet.</p>}

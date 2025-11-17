@@ -1,10 +1,11 @@
 import { useEffect, useMemo, useState } from 'react'
-import { Music, Gauge, Play, List, Database, User, Crown } from 'lucide-react'
+import { Music, Gauge, Play, List, Database, User, Crown, LogIn } from 'lucide-react'
 import Calculator from './components/Calculator'
 import Metronome from './components/Metronome'
 import Sessions from './components/Sessions'
 import Profile from './components/Profile'
 import ProUpsell from './components/ProUpsell'
+import SignIn from './components/SignIn'
 
 function App() {
   const [bpm, setBpm] = useState(170)
@@ -75,6 +76,11 @@ function App() {
     try { localStorage.setItem('user_id', user_id) } catch {}
   }
 
+  const handleSignedIn = ({ user_id, pro_token }) => {
+    setCurrentUserId(user_id)
+    if (pro_token) setPro(true)
+  }
+
   // Restore lightweight sign-in from localStorage
   useEffect(() => {
     const uid = localStorage.getItem('user_id')
@@ -136,13 +142,20 @@ function App() {
           </div>
         </section>
 
-        <section className="mt-10 bg-white/70 backdrop-blur p-6 rounded-xl border">
-          <h3 className="text-base font-semibold text-gray-900 mb-2">Quick session</h3>
-          <p className="text-sm text-gray-600 mb-4">Set your pace and run type, start the metronome, and go. When you stop, a brief session log is saved.</p>
-          <div className="flex flex-wrap gap-2">
-            {[150,160,165,170,175,180,185,190].map(v => (
-              <button key={v} onClick={()=>setBpm(v)} className={`px-3 py-1.5 rounded border text-sm ${bpm===v ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white hover:bg-gray-50'}`}>{v} bpm</button>
-            ))}
+        <section className="mt-10 grid md:grid-cols-2 gap-6 items-start">
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2"><LogIn className="h-5 w-5"/> Sign in</h2>
+            <SignIn onSignedIn={handleSignedIn} />
+            <p className="text-xs text-gray-600">Passwordless sign-in with a one-time code sent to your email. In development, the code is shown after you request it.</p>
+          </div>
+          <div className="space-y-4">
+            <h3 className="text-base font-semibold text-gray-900 mb-2">Quick session</h3>
+            <p className="text-sm text-gray-600 mb-4">Set your pace and run type, start the metronome, and go. When you stop, a brief session log is saved.</p>
+            <div className="flex flex-wrap gap-2">
+              {[150,160,165,170,175,180,185,190].map(v => (
+                <button key={v} onClick={()=>setBpm(v)} className={`px-3 py-1.5 rounded border text-sm ${bpm===v ? 'bg-indigo-600 text-white border-indigo-600' : 'bg-white hover:bg-gray-50'}`}>{v} bpm</button>
+              ))}
+            </div>
           </div>
         </section>
       </main>

@@ -1,15 +1,24 @@
-import { useState } from 'react'
-import { Music, Gauge, Play, List, Database, User } from 'lucide-react'
+import { useEffect, useMemo, useState } from 'react'
+import { Music, Gauge, Play, List, Database, User, Crown } from 'lucide-react'
 import Calculator from './components/Calculator'
 import Metronome from './components/Metronome'
 import Sessions from './components/Sessions'
 import Profile from './components/Profile'
+import ProUpsell from './components/ProUpsell'
 
 function App() {
   const [bpm, setBpm] = useState(170)
   const [lastParams, setLastParams] = useState(null)
   const [currentUserId, setCurrentUserId] = useState('')
+  const [pro, setPro] = useState(false)
   const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+  useEffect(() => {
+    const url = new URL(window.location.href)
+    const proFlag = url.searchParams.get('pro')
+    const stored = localStorage.getItem('pro')
+    if (proFlag === '1' || stored === '1') setPro(true)
+  }, [])
 
   const handleStop = async ({ durationSeconds }) => {
     try {
@@ -38,7 +47,7 @@ function App() {
   }
 
   return (
-    <div className="min-h-screen bg-gradient-to-br from-cyan-50 via-sky-50 to-indigo-50">
+    <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-sky-50 to-cyan-100">
       <header className="px-6 py-4 flex items-center justify-between">
         <div className="flex items-center gap-2">
           <div className="h-9 w-9 rounded-lg bg-indigo-600 text-white grid place-items-center">
@@ -49,12 +58,23 @@ function App() {
             <h1 className="text-xl font-bold text-gray-900">Metronome</h1>
           </div>
         </div>
-        <a href="/test" className="inline-flex items-center gap-2 text-sm text-indigo-700 hover:text-indigo-900">
-          <Database className="h-4 w-4" /> Backend Test
-        </a>
+        <div className="flex items-center gap-3">
+          {pro ? (
+            <span className="inline-flex items-center gap-1.5 text-amber-700 bg-amber-100 px-2 py-1 rounded text-xs font-medium"><Crown className="h-4 w-4"/> Pro</span>
+          ) : null}
+          <a href="/test" className="inline-flex items-center gap-2 text-sm text-indigo-700 hover:text-indigo-900">
+            <Database className="h-4 w-4" /> Backend Test
+          </a>
+        </div>
       </header>
 
       <main className="max-w-5xl mx-auto px-6 pb-16">
+        {!pro && (
+          <section className="mb-8">
+            <ProUpsell onActivate={setPro} />
+          </section>
+        )}
+
         <section className="grid md:grid-cols-2 gap-6 items-start">
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2"><Gauge className="h-5 w-5"/> Cadence Calculator</h2>
@@ -76,8 +96,8 @@ function App() {
           </div>
           <div className="space-y-4">
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2"><List className="h-5 w-5"/> Sessions</h2>
-            <Sessions userId={currentUserId || null} />
-            <p className="text-xs text-gray-600">Showing {currentUserId ? 'your sessions' : 'all recent sessions'}. Save a profile to filter by your ID.</p>
+            <Sessions userId={currentUserId || null} pro={pro} />
+            <p className="text-xs text-gray-600">Showing {currentUserId ? 'your sessions' : 'all recent sessions'}. Unlock Pro for full history.</p>
           </div>
         </section>
 

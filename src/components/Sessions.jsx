@@ -69,6 +69,11 @@ export default function Sessions({ userId = null, pro = false }) {
     setShowLegend(false)
   }
 
+  const goToProBenefits = () => {
+    try { window.location.hash = 'pro' } catch {}
+    dismissLegend()
+  }
+
   const cappedCount = !pro && items.length > 5 ? 5 : null
   const totalCount = items.length
 
@@ -94,11 +99,16 @@ export default function Sessions({ userId = null, pro = false }) {
       {showLegend && (
         <div className="mb-3 rounded-md border border-indigo-200 bg-indigo-50 px-3 py-2 text-xs text-indigo-900">
           <div className="flex items-start justify-between gap-2">
-            <p>
-              • The chip shows if your history request used a Pro token.<br />
-              • Rows that are dimmed are beyond the Free limit. Unlock with Pro to reveal them.<br />
-              • “Use Pro” activates your purchase on this device if you’ve already upgraded.
-            </p>
+            <div>
+              <p>
+                • The chip shows if your history request used a Pro token.<br />
+                • Rows that are dimmed are beyond the Free limit. Unlock with Pro to reveal them.<br />
+                • “Use Pro” activates your purchase on this device if you’ve already upgraded.
+              </p>
+              <button onClick={goToProBenefits} className="mt-2 inline-block text-indigo-700 hover:text-indigo-900 underline">
+                See full Pro benefits
+              </button>
+            </div>
             <button onClick={dismissLegend} className="shrink-0 text-indigo-700 hover:text-indigo-900 underline">Got it</button>
           </div>
         </div>

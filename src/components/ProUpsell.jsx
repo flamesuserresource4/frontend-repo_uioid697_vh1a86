@@ -2,12 +2,30 @@ import { Sparkles, ShieldCheck, Crown } from 'lucide-react'
 
 export default function ProUpsell({ onActivate }) {
   const checkoutUrl = import.meta.env.VITE_PRO_CHECKOUT_URL || '#'
+  const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
-  const activateDemo = () => {
+  const activateFromEmail = async () => {
+    const email = window.prompt('Enter the email you used at checkout:')
+    if (!email) return
     try {
-      localStorage.setItem('pro', '1')
-      onActivate && onActivate(true)
-    } catch {}
+      const resp = await fetch(`${backend}/api/pro/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email })
+      })
+      if (!resp.ok) throw new Error('No entitlement found')
+      const data = await resp.json()
+      if (data?.pro && data?.token) {
+        localStorage.setItem('pro', '1')
+        localStorage.setItem('pro_token', data.token)
+        onActivate && onActivate(true)
+        alert('Pro unlocked on this device. Enjoy!')
+      } else {
+        throw new Error('Invalid response')
+      }
+    } catch (e) {
+      alert(e.message || 'Could not verify purchase. Please try again later.')
+    }
   }
 
   return (
@@ -28,9 +46,9 @@ export default function ProUpsell({ onActivate }) {
             <a href={checkoutUrl} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium inline-flex items-center gap-2">
               <Sparkles className="h-4 w-4"/> Unlock Pro — $5
             </a>
-            <button onClick={activateDemo} className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm">I already paid (demo)</button>
+            <button onClick={activateFromEmail} className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm">I already paid</button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Tip: Set VITE_PRO_CHECKOUT_URL to a Stripe payment link. After paying, you can return with ?pro=1 to unlock Pro on this device.</p>
+          <p className="text-xs text-gray-500 mt-2">Tip: Set VITE_PRO_CHECKOUT_URL to a Stripe payment link. After paying, return here and click “I already paid” using the same email.</p>
         </div>
       </div>
     </div>

@@ -1,6 +1,6 @@
-import { useEffect, useMemo, useState } from 'react'
+import { useEffect, useState } from 'react'
 
-export default function Calculator({ onBpm }) {
+export default function Calculator({ onBpm, onParams }) {
   const [paceValue, setPaceValue] = useState(5.0)
   const [paceUnit, setPaceUnit] = useState('min_per_km')
   const [runType, setRunType] = useState('easy')
@@ -39,6 +39,7 @@ export default function Calculator({ onBpm }) {
 
   useEffect(() => {
     calculate()
+    onParams && onParams({ pace_value: parseFloat(paceValue), pace_unit: paceUnit, run_type: runType })
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [paceValue, paceUnit, runType, baseline, target])
 

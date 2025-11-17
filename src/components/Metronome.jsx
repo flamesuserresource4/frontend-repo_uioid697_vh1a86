@@ -1,13 +1,14 @@
 import { useEffect, useRef, useState } from 'react'
 
 // Simple WebAudio-based metronome with basic drift correction
-export default function Metronome({ bpm, onTick }) {
+export default function Metronome({ bpm, onTick, onStart, onStop }) {
   const [isPlaying, setIsPlaying] = useState(false)
   const [accentEvery, setAccentEvery] = useState(4)
   const audioCtxRef = useRef(null)
   const nextNoteTimeRef = useRef(0)
   const currentNoteRef = useRef(0)
   const schedulerIdRef = useRef(null)
+  const startTsRef = useRef(null)
 
   const secondsPerBeat = bpm > 0 ? 60.0 / bpm : 0.5
 
@@ -55,14 +56,22 @@ export default function Metronome({ bpm, onTick }) {
 
     currentNoteRef.current = 0
     nextNoteTimeRef.current = ctx.currentTime + 0.05
+    startTsRef.current = Date.now()
     setIsPlaying(true)
+    if (onStart) onStart({ startedAt: startTsRef.current })
     scheduler()
   }
 
   const stop = async () => {
+    if (!isPlaying) return
     setIsPlaying(false)
     if (schedulerIdRef.current) clearTimeout(schedulerIdRef.current)
     schedulerIdRef.current = null
+    const startedAt = startTsRef.current
+    startTsRef.current = null
+    const endedAt = Date.now()
+    const durationSeconds = startedAt ? Math.max(0, Math.round((endedAt - startedAt) / 1000)) : 0
+    if (onStop) onStop({ durationSeconds, endedAt })
     // Don't close the context to allow quick restart
   }
 

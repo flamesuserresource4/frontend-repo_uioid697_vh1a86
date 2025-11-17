@@ -4,6 +4,7 @@ export default function Sessions({ userId = null, pro = false }) {
   const [items, setItems] = useState([])
   const [loading, setLoading] = useState(false)
   const [error, setError] = useState(null)
+  const [usedPro, setUsedPro] = useState(false)
   const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
   const load = async () => {
@@ -12,6 +13,7 @@ export default function Sessions({ userId = null, pro = false }) {
     try {
       const qs = userId ? `?user_id=${encodeURIComponent(userId)}` : ''
       const token = localStorage.getItem('pro_token')
+      setUsedPro(!!token)
       const resp = await fetch(`${backend}/api/sessions${qs}`, {
         headers: token ? { 'Authorization': `Bearer ${token}` } : {}
       })
@@ -28,11 +30,48 @@ export default function Sessions({ userId = null, pro = false }) {
 
   const visibleItems = pro ? items : items.slice(0, 5)
 
+  const claimAndReload = async () => {
+    try {
+      if (!userId) {
+        alert('Sign in to use Pro with your session history.')
+        return
+      }
+      const resp = await fetch(`${backend}/api/pro/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: userId })
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data?.detail || 'Unable to claim Pro')
+      if (data?.token) {
+        try {
+          localStorage.setItem('pro_token', data.token)
+          localStorage.setItem('pro', '1')
+        } catch {}
+        await load()
+      }
+    } catch (e) {
+      alert(e.message || 'Could not enable Pro for history. If you already purchased, try the Claim Pro button in the upgrade card.')
+    }
+  }
+
   return (
     <div className="bg-white/70 backdrop-blur p-4 rounded-lg shadow border">
       <div className="flex items-center justify-between mb-3">
-        <h3 className="text-base font-semibold text-gray-800">Recent sessions {(!pro) && <span className="ml-2 text-xs text-amber-700 bg-amber-100 px-2 py-0.5 rounded">Free</span>}</h3>
-        <button onClick={load} className="text-sm text-indigo-700 hover:text-indigo-900">Refresh</button>
+        <div className="flex items-center gap-2">
+          <h3 className="text-base font-semibold text-gray-800">Recent sessions</h3>
+          <span className={`text-xs px-2 py-0.5 rounded border ${usedPro ? 'text-amber-700 bg-amber-100 border-amber-200' : 'text-gray-600 bg-gray-100 border-gray-200'}`}>
+            {usedPro ? 'Pro (JWT)' : 'Free'}
+          </span>
+        </div>
+        <div className="flex items-center gap-2">
+          {!usedPro && userId && (
+            <button onClick={claimAndReload} className="text-xs bg-indigo-600 text-white hover:bg-indigo-700 px-2 py-1 rounded">
+              Use Pro
+            </button>
+          )}
+          <button onClick={load} className="text-sm text-indigo-700 hover:text-indigo-900">Refresh</button>
+        </div>
       </div>
       {loading && <p className="text-sm text-gray-500">Loading…</p>}
       {error && <p className="text-sm text-rose-600">{error}</p>}

@@ -1,18 +1,21 @@
 import { useState } from 'react'
-import { Music, Gauge, Play, List, Database, Save } from 'lucide-react'
+import { Music, Gauge, Play, List, Database, User } from 'lucide-react'
 import Calculator from './components/Calculator'
 import Metronome from './components/Metronome'
+import Sessions from './components/Sessions'
+import Profile from './components/Profile'
 
 function App() {
   const [bpm, setBpm] = useState(170)
   const [lastParams, setLastParams] = useState(null)
+  const [currentUserId, setCurrentUserId] = useState('')
   const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
   const handleStop = async ({ durationSeconds }) => {
     try {
       if (!lastParams || !bpm || durationSeconds <= 0) return
       const payload = {
-        user_id: null,
+        user_id: currentUserId || null,
         pace_value: lastParams.pace_value,
         pace_unit: lastParams.pace_unit,
         run_type: lastParams.run_type,
@@ -25,10 +28,13 @@ function App() {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify(payload)
       })
-      // Optional: toast/feedback could be added
     } catch (e) {
       console.error('Failed to log session', e)
     }
+  }
+
+  const handleProfileSaved = ({ user_id }) => {
+    setCurrentUserId(user_id)
   }
 
   return (
@@ -59,6 +65,19 @@ function App() {
             <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2"><Play className="h-5 w-5"/> Metronome</h2>
             <Metronome bpm={bpm} onStop={handleStop} />
             <p className="text-xs text-gray-500">Tip: use headphones. Volume depends on your device settings.</p>
+          </div>
+        </section>
+
+        <section className="mt-10 grid md:grid-cols-2 gap-6 items-start">
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2"><User className="h-5 w-5"/> Profile</h2>
+            <Profile onSaved={handleProfileSaved} initialUserId={currentUserId} />
+            <p className="text-xs text-gray-600">Enter an ID or email to create your profile. Sessions you record will be linked to this ID.</p>
+          </div>
+          <div className="space-y-4">
+            <h2 className="text-lg font-semibold text-gray-800 flex items-center gap-2"><List className="h-5 w-5"/> Sessions</h2>
+            <Sessions userId={currentUserId || null} />
+            <p className="text-xs text-gray-600">Showing {currentUserId ? 'your sessions' : 'all recent sessions'}. Save a profile to filter by your ID.</p>
           </div>
         </section>
 

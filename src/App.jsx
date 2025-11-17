@@ -1,5 +1,5 @@
-import { useEffect, useMemo, useState } from 'react'
-import { Music, Gauge, Play, List, Database, User, Crown, LogIn } from 'lucide-react'
+import { useEffect, useMemo, useRef, useState } from 'react'
+import { Music, Gauge, Play, List, Database, User, Crown, LogIn, RefreshCw, LogOut } from 'lucide-react'
 import Calculator from './components/Calculator'
 import Metronome from './components/Metronome'
 import Sessions from './components/Sessions'
@@ -12,7 +12,101 @@ function App() {
   const [lastParams, setLastParams] = useState(null)
   const [currentUserId, setCurrentUserId] = useState('')
   const [pro, setPro] = useState(false)
+  const [tokenExp, setTokenExp] = useState(null)
+  const expiryTimerRef = useRef(null)
   const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+  const clearExpiryTimer = () => {
+    if (expiryTimerRef.current) {
+      try { clearTimeout(expiryTimerRef.current) } catch {}
+      expiryTimerRef.current = null
+    }
+  }
+
+  const handleSignOut = () => {
+    clearExpiryTimer()
+    setPro(false)
+    setTokenExp(null)
+    setCurrentUserId('')
+    try {
+      localStorage.removeItem('pro')
+      localStorage.removeItem('pro_token')
+      localStorage.removeItem('user_id')
+    } catch {}
+  }
+
+  const scheduleExpiry = (expSeconds) => {
+    clearExpiryTimer()
+    if (!expSeconds) return
+    const nowMs = Date.now()
+    const expMs = expSeconds * 1000
+    const msUntil = Math.max(0, expMs - nowMs)
+    // Give a tiny grace period before clearing to avoid edge flicker
+    const timeoutMs = msUntil + 500
+    expiryTimerRef.current = setTimeout(() => {
+      // Token expired → soft downgrade, keep identity
+      try {
+        localStorage.removeItem('pro')
+        localStorage.removeItem('pro_token')
+      } catch {}
+      setPro(false)
+      setTokenExp(null)
+    }, timeoutMs)
+  }
+
+  // Verify Pro token helper
+  const verifyToken = async (token) => {
+    try {
+      const resp = await fetch(`${backend}/api/pro/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(token)
+      })
+      if (!resp.ok) throw new Error('invalid')
+      const data = await resp.json()
+      if (data?.pro) {
+        try { localStorage.setItem('pro', '1') } catch {}
+        setPro(true)
+        if (data?.exp) {
+          setTokenExp(data.exp)
+          scheduleExpiry(data.exp)
+        }
+        return true
+      }
+    } catch (e) {
+      // fall through
+    }
+    try {
+      localStorage.removeItem('pro')
+      localStorage.removeItem('pro_token')
+    } catch {}
+    setPro(false)
+    setTokenExp(null)
+    return false
+  }
+
+  const refreshPro = async () => {
+    try {
+      const uid = localStorage.getItem('user_id') || currentUserId || null
+      if (!uid) throw new Error('Sign in to refresh Pro')
+      const resp = await fetch(`${backend}/api/pro/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: uid })
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data?.detail || 'Could not refresh')
+      if (data?.token) {
+        try {
+          localStorage.setItem('pro_token', data.token)
+          localStorage.setItem('pro', '1')
+        } catch {}
+        await verifyToken(data.token)
+      }
+    } catch (e) {
+      alert(e.message || 'Unable to refresh Pro. If you purchased, try signing in with your purchase email and press Claim Pro in the upsell card.')
+    }
+  }
 
   // On load, restore pro from URL/localStorage and verify token if present
   useEffect(() => {
@@ -22,31 +116,26 @@ function App() {
     const token = localStorage.getItem('pro_token')
     if (proFlag === '1' || stored === '1') setPro(true)
     if (token) {
-      // Verify token with backend; if invalid, clear and set pro false
-      fetch(`${backend}/api/pro/verify`, {
-        method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify(token)
-      })
-        .then(async (r) => {
-          if (!r.ok) throw new Error('invalid')
-          const data = await r.json()
-          if (data?.pro) {
-            localStorage.setItem('pro', '1')
-            setPro(true)
-          } else {
-            localStorage.removeItem('pro')
-            localStorage.removeItem('pro_token')
-            setPro(false)
-          }
-        })
-        .catch(() => {
-          localStorage.removeItem('pro')
-          localStorage.removeItem('pro_token')
-          setPro(false)
-        })
+      verifyToken(token)
     }
   }, [])
+
+  // Visibility change: if we have a token with exp in past, downgrade immediately
+  useEffect(() => {
+    const onVis = () => {
+      if (!tokenExp) return
+      if (Date.now() >= tokenExp * 1000) {
+        try {
+          localStorage.removeItem('pro')
+          localStorage.removeItem('pro_token')
+        } catch {}
+        setPro(false)
+        setTokenExp(null)
+      }
+    }
+    document.addEventListener('visibilitychange', onVis)
+    return () => document.removeEventListener('visibilitychange', onVis)
+  }, [tokenExp])
 
   const handleStop = async ({ durationSeconds }) => {
     try {
@@ -60,9 +149,13 @@ function App() {
         duration_seconds: durationSeconds,
         notes: null,
       }
+      const token = localStorage.getItem('pro_token')
       await fetch(`${backend}/api/sessions`, {
         method: 'POST',
-        headers: { 'Content-Type': 'application/json' },
+        headers: {
+          'Content-Type': 'application/json',
+          ...(token ? { 'Authorization': `Bearer ${token}` } : {})
+        },
         body: JSON.stringify(payload)
       })
     } catch (e) {
@@ -78,7 +171,9 @@ function App() {
 
   const handleSignedIn = ({ user_id, pro_token }) => {
     setCurrentUserId(user_id)
-    if (pro_token) setPro(true)
+    if (pro_token) {
+      verifyToken(pro_token)
+    }
   }
 
   // Restore lightweight sign-in from localStorage
@@ -86,6 +181,13 @@ function App() {
     const uid = localStorage.getItem('user_id')
     if (uid) setCurrentUserId(uid)
   }, [])
+
+  const expMinutesRemaining = useMemo(() => {
+    if (!tokenExp) return null
+    const diffMs = tokenExp * 1000 - Date.now()
+    if (diffMs <= 0) return 0
+    return Math.ceil(diffMs / 60000)
+  }, [tokenExp])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-sky-50 to-cyan-100">
@@ -103,6 +205,19 @@ function App() {
           {pro ? (
             <span className="inline-flex items-center gap-1.5 text-amber-700 bg-amber-100 px-2 py-1 rounded text-xs font-medium"><Crown className="h-4 w-4"/> Pro</span>
           ) : null}
+          {pro && typeof expMinutesRemaining === 'number' && (
+            <span className="text-xs text-gray-600">{expMinutesRemaining === 0 ? 'Token expired' : `Token expires in ~${expMinutesRemaining}m`}</span>
+          )}
+          {pro && (
+            <button onClick={refreshPro} className="inline-flex items-center gap-1.5 text-xs bg-white/80 hover:bg-white px-2 py-1 rounded border">
+              <RefreshCw className="h-3.5 w-3.5"/> Refresh Pro
+            </button>
+          )}
+          {currentUserId ? (
+            <button onClick={handleSignOut} className="inline-flex items-center gap-1.5 text-xs text-rose-700 bg-rose-50 hover:bg-rose-100 px-2 py-1 rounded border border-rose-200">
+              <LogOut className="h-3.5 w-3.5"/> Sign out
+            </button>
+          ) : null}
           <a href="/test" className="inline-flex items-center gap-2 text-sm text-indigo-700 hover:text-indigo-900">
             <Database className="h-4 w-4" /> Backend Test
           </a>
@@ -112,7 +227,7 @@ function App() {
       <main className="max-w-5xl mx-auto px-6 pb-16">
         {!pro && (
           <section className="mb-8">
-            <ProUpsell onActivate={setPro} />
+            <ProUpsell onActivate={setPro} userId={currentUserId} />
           </section>
         )}
 

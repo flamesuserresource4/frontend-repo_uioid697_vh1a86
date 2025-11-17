@@ -1,8 +1,54 @@
-import { Sparkles, ShieldCheck, Crown } from 'lucide-react'
+import { Sparkles, ShieldCheck, Crown, BadgeCheck } from 'lucide-react'
 
-export default function ProUpsell({ onActivate }) {
+export default function ProUpsell({ onActivate, userId = '' }) {
   const checkoutUrl = import.meta.env.VITE_PRO_CHECKOUT_URL || '#'
   const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
+
+  const verifyToken = async (token) => {
+    try {
+      const resp = await fetch(`${backend}/api/pro/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(token)
+      })
+      if (!resp.ok) return false
+      const data = await resp.json()
+      if (data?.pro) return true
+    } catch {}
+    return false
+  }
+
+  const claimForCurrentUser = async () => {
+    const uid = userId || localStorage.getItem('user_id')
+    if (!uid) {
+      alert('Sign in first so we can attach Pro to your profile.')
+      return
+    }
+    try {
+      const resp = await fetch(`${backend}/api/pro/claim`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ user_id: uid })
+      })
+      const data = await resp.json()
+      if (!resp.ok) throw new Error(data?.detail || 'No entitlement found for this user')
+      if (data?.token) {
+        localStorage.setItem('pro_token', data.token)
+        localStorage.setItem('pro', '1')
+        const ok = await verifyToken(data.token)
+        if (ok) {
+          onActivate && onActivate(true)
+          alert('Pro activated for your profile on this device. Enjoy!')
+        } else {
+          throw new Error('Could not verify Pro token after claim')
+        }
+      } else {
+        throw new Error('Invalid response from server')
+      }
+    } catch (e) {
+      alert(e.message || 'Could not claim Pro. Make sure you are signed in with the purchase email.')
+    }
+  }
 
   const activateFromEmail = async () => {
     const email = window.prompt('Enter the email you used at checkout:')
@@ -13,13 +59,18 @@ export default function ProUpsell({ onActivate }) {
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ email })
       })
-      if (!resp.ok) throw new Error('No entitlement found')
       const data = await resp.json()
-      if (data?.pro && data?.token) {
+      if (!resp.ok) throw new Error(data?.detail || 'No entitlement found')
+      if (data?.token) {
         localStorage.setItem('pro', '1')
         localStorage.setItem('pro_token', data.token)
-        onActivate && onActivate(true)
-        alert('Pro unlocked on this device. Enjoy!')
+        const ok = await verifyToken(data.token)
+        if (ok) {
+          onActivate && onActivate(true)
+          alert('Pro unlocked. Consider signing in so your sessions sync across devices.')
+        } else {
+          throw new Error('Could not verify Pro token after claim')
+        }
       } else {
         throw new Error('Invalid response')
       }
@@ -71,8 +122,13 @@ export default function ProUpsell({ onActivate }) {
               <Sparkles className="h-4 w-4"/> Unlock Pro — $5
             </button>
             <button onClick={activateFromEmail} className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm">I already paid</button>
+            {(userId || localStorage.getItem('user_id')) && (
+              <button onClick={claimForCurrentUser} className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm inline-flex items-center gap-2">
+                <BadgeCheck className="h-4 w-4 text-amber-600"/> Claim Pro for my profile
+              </button>
+            )}
           </div>
-          <p className="text-xs text-gray-500 mt-2">Tip: If dynamic checkout is unavailable, set VITE_PRO_CHECKOUT_URL to your Stripe payment link. After paying, return here and click “I already paid” using the same email.</p>
+          <p className="text-xs text-gray-500 mt-2">Tip: If dynamic checkout is unavailable, set VITE_PRO_CHECKOUT_URL to your Stripe payment link. After paying, return here and click “I already paid” using the same email. If you are signed in, use “Claim Pro for my profile”.</p>
         </div>
       </div>
     </div>

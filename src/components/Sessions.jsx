@@ -11,7 +11,10 @@ export default function Sessions({ userId = null, pro = false }) {
     setError(null)
     try {
       const qs = userId ? `?user_id=${encodeURIComponent(userId)}` : ''
-      const resp = await fetch(`${backend}/api/sessions${qs}`)
+      const token = localStorage.getItem('pro_token')
+      const resp = await fetch(`${backend}/api/sessions${qs}`, {
+        headers: token ? { 'Authorization': `Bearer ${token}` } : {}
+      })
       const data = await resp.json()
       setItems(data.items || [])
     } catch (e) {

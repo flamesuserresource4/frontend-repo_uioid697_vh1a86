@@ -13,11 +13,38 @@ function App() {
   const [pro, setPro] = useState(false)
   const backend = import.meta.env.VITE_BACKEND_URL || 'http://localhost:8000'
 
+  // On load, restore pro from URL/localStorage and verify token if present
   useEffect(() => {
     const url = new URL(window.location.href)
     const proFlag = url.searchParams.get('pro')
     const stored = localStorage.getItem('pro')
+    const token = localStorage.getItem('pro_token')
     if (proFlag === '1' || stored === '1') setPro(true)
+    if (token) {
+      // Verify token with backend; if invalid, clear and set pro false
+      fetch(`${backend}/api/pro/verify`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify(token)
+      })
+        .then(async (r) => {
+          if (!r.ok) throw new Error('invalid')
+          const data = await r.json()
+          if (data?.pro) {
+            localStorage.setItem('pro', '1')
+            setPro(true)
+          } else {
+            localStorage.removeItem('pro')
+            localStorage.removeItem('pro_token')
+            setPro(false)
+          }
+        })
+        .catch(() => {
+          localStorage.removeItem('pro')
+          localStorage.removeItem('pro_token')
+          setPro(false)
+        })
+    }
   }, [])
 
   const handleStop = async ({ durationSeconds }) => {
@@ -44,7 +71,15 @@ function App() {
 
   const handleProfileSaved = ({ user_id }) => {
     setCurrentUserId(user_id)
+    // Persist lightweight sign-in across devices
+    try { localStorage.setItem('user_id', user_id) } catch {}
   }
+
+  // Restore lightweight sign-in from localStorage
+  useEffect(() => {
+    const uid = localStorage.getItem('user_id')
+    if (uid) setCurrentUserId(uid)
+  }, [])
 
   return (
     <div className="min-h-screen bg-gradient-to-br from-indigo-50 via-sky-50 to-cyan-100">

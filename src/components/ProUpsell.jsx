@@ -28,6 +28,30 @@ export default function ProUpsell({ onActivate }) {
     }
   }
 
+  const startCheckout = async () => {
+    try {
+      const emailPrefill = window.prompt('Enter email for receipt (optional):') || undefined
+      const resp = await fetch(`${backend}/api/checkout/create`, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ email: emailPrefill })
+      })
+      const data = await resp.json()
+      if (data?.url) {
+        window.location.href = data.url
+      } else {
+        throw new Error('Could not create checkout session')
+      }
+    } catch (e) {
+      // Fallback to static link if dynamic session not available
+      if (checkoutUrl && checkoutUrl !== '#') {
+        window.location.href = checkoutUrl
+      } else {
+        alert(e.message || 'Checkout unavailable. Please try again later.')
+      }
+    }
+  }
+
   return (
     <div className="bg-white/80 backdrop-blur p-6 rounded-xl border shadow">
       <div className="flex items-start gap-3">
@@ -43,12 +67,12 @@ export default function ProUpsell({ onActivate }) {
             <li className="flex items-center gap-2"><ShieldCheck className="h-4 w-4 text-emerald-600"/> Thank-you shoutout in release notes</li>
           </ul>
           <div className="mt-4 flex flex-wrap gap-2">
-            <a href={checkoutUrl} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium inline-flex items-center gap-2">
+            <button onClick={startCheckout} className="px-4 py-2 rounded-lg bg-amber-600 hover:bg-amber-700 text-white text-sm font-medium inline-flex items-center gap-2">
               <Sparkles className="h-4 w-4"/> Unlock Pro — $5
-            </a>
+            </button>
             <button onClick={activateFromEmail} className="px-3 py-2 rounded-lg border bg-white hover:bg-gray-50 text-sm">I already paid</button>
           </div>
-          <p className="text-xs text-gray-500 mt-2">Tip: Set VITE_PRO_CHECKOUT_URL to a Stripe payment link. After paying, return here and click “I already paid” using the same email.</p>
+          <p className="text-xs text-gray-500 mt-2">Tip: If dynamic checkout is unavailable, set VITE_PRO_CHECKOUT_URL to your Stripe payment link. After paying, return here and click “I already paid” using the same email.</p>
         </div>
       </div>
     </div>

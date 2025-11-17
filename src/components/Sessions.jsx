@@ -85,6 +85,15 @@ export default function Sessions({ userId = null, pro = false }) {
           <span className={`text-xs px-2 py-0.5 rounded border ${usedPro ? 'text-amber-700 bg-amber-100 border-amber-200' : 'text-gray-600 bg-gray-100 border-gray-200'}`}>
             {usedPro ? 'Pro (JWT)' : 'Free'}
           </span>
+          <button
+            type="button"
+            aria-label="What’s this?"
+            title="What’s this?"
+            onClick={() => setShowLegend(true)}
+            className="ml-1 text-[10px] leading-none w-4 h-4 flex items-center justify-center rounded-full border border-gray-300 text-gray-600 hover:bg-gray-100"
+          >
+            ?
+          </button>
         </div>
         <div className="flex items-center gap-2">
           {!usedPro && userId && (

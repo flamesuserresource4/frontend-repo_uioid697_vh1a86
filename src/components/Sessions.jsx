@@ -28,8 +28,6 @@ export default function Sessions({ userId = null, pro = false }) {
 
   useEffect(() => { load() }, [userId])
 
-  const visibleItems = pro ? items : items.slice(0, 5)
-
   const claimAndReload = async () => {
     try {
       if (!userId) {
@@ -55,6 +53,9 @@ export default function Sessions({ userId = null, pro = false }) {
     }
   }
 
+  const cappedCount = !pro && items.length > 5 ? 5 : null
+  const totalCount = items.length
+
   return (
     <div className="bg-white/70 backdrop-blur p-4 rounded-lg shadow border">
       <div className="flex items-center justify-between mb-3">
@@ -75,20 +76,35 @@ export default function Sessions({ userId = null, pro = false }) {
       </div>
       {loading && <p className="text-sm text-gray-500">Loading…</p>}
       {error && <p className="text-sm text-rose-600">{error}</p>}
-      {(!loading && visibleItems.length === 0) && <p className="text-sm text-gray-500">No sessions yet.</p>}
-      <ul className="divide-y">
-        {visibleItems.map((s) => (
-          <li key={s._id} className="py-3 flex items-center justify-between">
-            <div>
-              <p className="text-sm font-medium text-gray-900">{s.run_type} • {s.target_bpm} bpm</p>
-              <p className="text-xs text-gray-500">{s.pace_value} {s.pace_unit.replace('_','/')} • {s.duration_seconds}s</p>
+      {(!loading && totalCount === 0) && <p className="text-sm text-gray-500">No sessions yet.</p>}
+
+      {!loading && totalCount > 0 && (
+        <>
+          <ul className="divide-y">
+            {items.map((s, idx) => {
+              const hidden = !pro && idx >= 5
+              return (
+                <li key={s._id} className={`py-3 flex items-center justify-between transition ${hidden ? 'opacity-40 grayscale pointer-events-none select-none' : ''}`}>
+                  <div>
+                    <p className="text-sm font-medium text-gray-900">{s.run_type} • {s.target_bpm} bpm</p>
+                    <p className="text-xs text-gray-500">{s.pace_value} {s.pace_unit.replace('_','/')} • {s.duration_seconds}s</p>
+                  </div>
+                  <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleString?.() || ''}</p>
+                </li>
+              )
+            })}
+          </ul>
+          {!pro && totalCount > 5 && (
+            <div className="mt-3 flex items-center justify-between">
+              <p className="text-xs text-gray-600">Showing {cappedCount} of {totalCount}. Unlock Pro to see full history.</p>
+              {!usedPro && userId && (
+                <button onClick={claimAndReload} className="text-xs text-indigo-700 hover:text-indigo-900 underline">
+                  Use Pro to unlock
+                </button>
+              )}
             </div>
-            <p className="text-xs text-gray-400">{new Date(s.created_at).toLocaleString?.() || ''}</p>
-          </li>
-        ))}
-      </ul>
-      {!pro && items.length > 5 && (
-        <p className="mt-3 text-xs text-gray-600">Showing 5 of {items.length}. Unlock Pro to see full history.</p>
+          )}
+        </>
       )}
     </div>
   )
